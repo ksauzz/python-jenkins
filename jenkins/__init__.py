@@ -119,6 +119,7 @@ STOP_BUILD = '%(folder_url)sjob/%(short_name)s/%(number)s/stop'
 BUILD_WITH_PARAMS_JOB = '%(folder_url)sjob/%(short_name)s/buildWithParameters'
 BUILD_INFO = '%(folder_url)sjob/%(short_name)s/%(number)d/api/json?depth=%(depth)s'
 BUILD_CONSOLE_OUTPUT = '%(folder_url)sjob/%(short_name)s/%(number)d/consoleText'
+BUILD_PROGRESSIVE_CONSOLE_OUTPUT = '%(folder_url)sjob/%(short_name)s/%(number)d/logText/progressiveText?start=%(start)d&mode=%(mode)s'
 BUILD_ENV_VARS = '%(folder_url)sjob/%(short_name)s/%(number)d/injectedEnvVars/api/json' + \
     '?depth=%(depth)s'
 BUILD_TEST_REPORT = '%(folder_url)sjob/%(short_name)s/%(number)d/testReport/api/json' + \
@@ -1661,6 +1662,36 @@ class Jenkins(object):
             ))
             if response:
                 return response
+            else:
+                raise JenkinsException('job[%s] number[%d] does not exist'
+                                       % (name, number))
+        except (req_exc.HTTPError, NotFoundException):
+            raise JenkinsException('job[%s] number[%d] does not exist'
+                                   % (name, number))
+
+    def get_build_progressive_console_output(self, name, number, start=0, mode='text'):
+        '''Get build console text.
+
+        :param name: Job name, ``str``
+        :param number: Build number, ``int``
+        :param start: Start position, ``int``
+        :param mode: 'text' or 'html', ``str``
+        :returns: Dictionary with 'output', 'size', and 'more' keys
+        '''
+        folder_url, short_name = self._get_job_folder(name)
+        try:
+            response = self.jenkins_request(requests.Request(
+                'GET', self._build_url(BUILD_PROGRESSIVE_CONSOLE_OUTPUT, locals())
+            ))
+            if response:
+                headers = response.headers
+                more = headers.get('x-more-data', 'false') == 'true'
+                size = int(headers.get('x-text-size', '0'))
+                return {
+                        'output': response.text,
+                        'more': more,
+                        'size': size
+                        }
             else:
                 raise JenkinsException('job[%s] number[%d] does not exist'
                                        % (name, number))
